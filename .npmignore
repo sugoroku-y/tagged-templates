@@ -1,0 +1,9 @@
+/lib/*.map
+/src/
+/coverage/
+/.vscode/
+*.tgz
+/test/
+.eslint*
+.prettier*
+jest.*

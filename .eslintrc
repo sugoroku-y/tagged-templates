@@ -1,0 +1,42 @@
+{
+  "root": true,
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "plugin:jest/recommended",
+    "plugin:jest/style",
+    "prettier"
+  ],
+  "plugins": ["jest", "@typescript-eslint"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": ["src/tsconfig.json", "test/tsconfig.json"]
+  },
+  "env": {
+    "jest/globals": true,
+    "es2021": true,
+    "node": true
+  },
+  "rules": {
+    // テストケースにはitではなくtestを使う
+    "jest/consistent-test-it": [
+      "error",
+      {
+        "fn": "test"
+      }
+    ],
+    // テストケースは必ずdescribeの中に入れる。
+    "jest/require-top-level-describe": ["error"],
+    // テンプレートリテラルでundefinedやunknownを使えるように
+    "@typescript-eslint/restrict-template-expressions": "off",
+    // _で始まる変数/引数等は対象外
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ]
+  }
+}
