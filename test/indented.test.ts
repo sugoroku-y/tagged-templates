@@ -253,6 +253,144 @@ ${''}
     }).toThrow();
   });
 });
+describe('indented.safe', () => {
+  test('empty template', () => {
+    expect(indented.safe``).toBe('');
+  });
+  test('The first character is not LF', () => {
+    expect(indented.safe`a
+    `).toBe('a\n    ');
+  });
+  test('first template is empty', () => {
+    expect(indented.safe`${''}
+    `).toBe('\n    ');
+  });
+  test('The template is empty', () => {
+    expect(indented.safe``).toBe('');
+  });
+  test('The template is call as function', () => {
+    const template = Object.assign([], { raw: [] });
+    // タグ付きテンプレートの第1引数が空になることはないので無理矢理、空の配列を指定して呼び出し
+    expect(indented.safe(template)).toBe('');
+  });
+  test('The last template is empty', () => {
+    expect(indented.safe`${''}`).toBe('');
+  });
+  test('The last template does not include LF', () => {
+    expect(indented.safe`
+    ${''}    `).toBe('\n        ');
+  });
+  test('The last line is not just spaces and tabs', () => {
+    expect(indented.safe`
+      a`).toBe('\n      a');
+  });
+  test('Indentation is uneven', () => {
+    expect(indented.safe`
+    A
+  B
+    `).toBe('\n    A\n  B\n    ');
+  });
+  test('Indentation is uneven with insert', () => {
+    expect(indented.safe`
+    A
+${''}
+    `).toBe('\n    A\n\n    ');
+  });
+  test('escaped error: unicode', () => {
+    expect(indented.safe`
+          ${''}abc \uXXXX
+          aaaaaa
+          `).toBe('abc uXXXX\naaaaaa');
+  });
+  test('escaped error: Unicode: short', () => {
+    expect(indented.safe`
+          ${''}abc \uAAA
+          aaaaaa
+          `).toBe('abc uAAA\naaaaaa');
+  });
+  test('escaped error: invalid Unicode', () => {
+    expect(indented.safe`
+          ${''}abc \uAAAX
+          aaaaaa
+          `).toBe('abc uAAAX\naaaaaa');
+  });
+  test('escaped error: unicode: braced', () => {
+    expect(indented.safe`
+          ${''}abc \u{XXXX}
+          aaaaaa
+          `).toBe('abc u{XXXX}\naaaaaa');
+  });
+  test('escaped error: unicode: unmatch brace', () => {
+    expect(indented.safe`
+          ${''}abc \u{XXXX
+          aaaaaa
+          `).toBe('abc u{XXXX\naaaaaa');
+  });
+  test('escaped error: unicode: empty in brace', () => {
+    expect(indented.safe`
+          ${''}abc \u{}
+          aaaaaa
+          `).toBe('abc u{}\naaaaaa');
+  });
+  test('escaped error: unicode: exceeded', () => {
+    expect(indented.safe`
+          ${''}abc \u{11ffff}
+          aaaaaa
+          `).toBe('abc u{11ffff}\naaaaaa');
+  });
+  test('escaped error: hexadecimal', () => {
+    expect(indented.safe`
+          ${''}abc \xXX
+          `).toBe('abc xXX');
+  });
+  test('escaped error: short hexadecimal', () => {
+    expect(indented.safe`
+          ${''}abc \xA
+          `).toBe('abc xA');
+  });
+  test('escaped error: invalid hexadecimal', () => {
+    expect(indented.safe`
+          ${''}abc \xAX
+          `).toBe('abc xAX');
+  });
+  test('escaped error: octet escape sequence: \\00', () => {
+    expect(indented.safe`
+          ${''}\00
+          `).toBe('00');
+  });
+  test('escaped error: octet escape sequence: \\09', () => {
+    expect(indented.safe`
+          ${''}\09
+          `).toBe('09');
+  });
+  test('escaped error: octet escape sequence: \\1', () => {
+    expect(indented.safe`
+          ${''}\1
+          `).toBe('1');
+  });
+  test('escaped error: octet escape sequence: \\7', () => {
+    expect(indented.safe`
+          ${''}\7
+          `).toBe('7');
+  });
+  test('escaped error: octet escape sequence: \\8', () => {
+    expect(indented.safe`
+          ${''}\8
+          `).toBe('8');
+  });
+  test('escaped error: octet escape sequence: \\9', () => {
+    expect(
+      indented.safe`
+          ${''}\9
+          `,
+    ).toBe('9');
+  });
+  test('indented freezed', () => {
+    expect(() => {
+      indented.safe = () => __filename;
+    }).toThrow();
+  });
+});
 
 describe('indented.raw', () => {
   test('unescaped backslash at end of line', () => {

@@ -118,20 +118,16 @@ export const unescape: {
         // エラーがあった該当行を抽出してエラー箇所を表示
         const bol = s.lastIndexOf('\n', index) + 1;
         const eol = (i => (i < 0 ? s.length : i))(s.indexOf('\n', bol));
+        // エラーのあった該当行
         const line = s.slice(bol, eol);
+        // エラーのあった位置までインデント
+        const colPadding = ' '.repeat(index - bol);
+        // エラー箇所の文字数にあわせる
+        const mark = '^'.repeat(match.length);
         return error.for(SyntaxError)`
-          ${
-            // エラーメッセージ
-            message
-          }
-          ${
-            // エラーのあった該当行
-            line
-          }
-          ${
-            // エラー位置までインデント
-            ' '.repeat(index - bol)
-          }${'^'.repeat(match.length) /* エラーとなった文字数分`^`を連ねる*/}
+          ${message}
+          ${line}
+          ${colPadding}${mark}
           `;
       }),
     {
