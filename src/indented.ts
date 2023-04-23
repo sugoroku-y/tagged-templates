@@ -1,120 +1,83 @@
 import assert from 'assert';
+import { basic } from './basic';
+import { unescape, captureStackTrace, addSafeUser } from './unescape';
 import { error } from './error';
-import { unescape } from './unescape';
+import type { TaggedTemplate } from './TaggedTemplate';
 
-/**
- * テンプレートの内容からインデントを抽出。
- *
- * テンプレートが不正な場合は例外を投げる(typeがsafe以外のとき)。
- *
- * @param {readonly string[]} template
- * @param type indentedの種類
- * @returns {string}
- */
-function extractIndent(
-  template: readonly string[],
-  isSafe: boolean,
-): string | undefined {
-  // タグ付きテンプレートとして呼ばれたらtemplate.lengthは1以上になるはず
-  if (template.length === 0) {
-    return isSafe
-      ? undefined
-      : error`
-      Call as a tagged template.
-      `;
-  }
-  const firstTemplate = template[0];
-  assert(firstTemplate !== undefined); // template.lengthが1以上なので、firstTemplateはundefinedではない
-  if (firstTemplate.charAt(0) !== '\n') {
-    // 先頭には改行がなければならない
-    return isSafe
-      ? undefined
-      : error`
-      The beginning must be a newline.
-      `;
-  }
-  const lastTemplate = template[template.length - 1];
-  assert(lastTemplate !== undefined); // template.lengthが1以上なので、lastTemplateはundefinedではない
-  const [indent] = /(?<=\n)[ \t]*$/.exec(lastTemplate) ?? [];
-  if (indent === undefined) {
-    // 末尾には行頭から空白もしくはタブのみでなければならない
-    return isSafe
-      ? undefined
-      : error`
-      The end must be spaces or tabs only from the beginning of the line.
-      `;
-  }
-  for (const t of template) {
-    for (const [lineIndent, emptyLine] of t.matchAll(
-      /(?<=\n)(?:(?=(\n))|[ \t]*)/g,
-    )) {
-      // 空行か行頭に指定のインデントがなければならない
-      if (!emptyLine && !lineIndent.startsWith(indent)) {
-        return isSafe ? undefined : error`Indentation is not aligned.`;
-      }
-    }
-  }
-  return indent;
+class IndentedFormatError extends Error {
+  override name = 'IndentedFormatError';
 }
 
-/**
- * indentedの実装
- *
- * @param type テンプレートの種類
- * - default 通常
- * - raw エスケープしない
- * - safe 例外を投げない
- * @param args タグ付きテンプレート関数の引数
- * @returns インデントを取り除いた内容
- * @throws
- * - indentedの仕様に合わない
- *   - 先頭が改行じゃなかった
- *   - 末尾行に空白とタブ以外の文字があった
- *   - 各行の行頭がインデントで統一されていなかった
- * - エスケープ文字が正しくない
- *   - 8進数のエスケープが使用された(単独の'\0'を除く)
- *   - '\8`や`\9`
- *   - `\x`や`\u`で16進数以外の文字が指定された
- *   - `\x`や`\u`で16進数の文字数が不足していた
- *   - `\u{～}`で0x10ffffを超える文字コードが指定された
- */
-function indented_implement(
-  extendedModifiers: Array<(s: string, index: number) => string>,
-  ...args: [TemplateStringsArray, ...unknown[]]
-): string {
-  try {
-    // 行末に`\`があればインデントと一緒に改行を除去するためにrawを使う
-    const [{ raw: template }] = args;
-    const indent = extractIndent(
-      template,
-      extendedModifiers[0] === unescape.safe,
-    );
-    if (indent === undefined) {
-      // safeが指定されていてテンプレートが不正だった場合は通常のテンプレートリテラルとほぼ同じにする
-      return template.length === 0
-        ? ''
-        : template.map(unescape.safe).reduce((r, e, i) => r.concat(args[i], e));
+function prepare(unescapeFunc?: (s: string) => string): TaggedTemplate {
+  return function indented(...args) {
+    try {
+      // 行末に`\`があればインデントと一緒に改行を除去するためにrawを使う
+      const [{ raw: template }] = args;
+      // タグ付きテンプレートとして呼ばれたらtemplate.lengthは1以上になるはず
+      if (template.length === 0) {
+        error.as(IndentedFormatError)`Call as a tagged template.`;
+      }
+      const firstTemplate = template[0];
+      assert(firstTemplate !== undefined); // template.lengthが1以上なので、firstTemplateはundefinedではない
+      if (firstTemplate.charAt(0) !== '\n') {
+        // 先頭の`の直後には改行がなければならない
+        error.as(IndentedFormatError)`
+          There must be a newline character immediately following the leading \`.
+          `;
+      }
+      const lastTemplate = template[template.length - 1];
+      assert(lastTemplate !== undefined); // template.lengthが1以上なので、lastTemplateはundefinedではない
+      // 末尾の`から行頭までにある空白/タブ
+      const [indent] =
+        /(?<=\n)[ \t]*$/.exec(lastTemplate) ??
+        // 末尾には行頭から空白もしくはタブのみでなければならない
+        error.as(IndentedFormatError)`
+            There must be no non-whitespace or non-tab characters between the trailing \
+            end \` and the beginning of the line.
+            `;
+      const illegalBeginningOfLine = new RegExp(`\n(?!\n|${indent})`);
+      if (template.some(t => illegalBeginningOfLine.test(t))) {
+        // 各行は空行であるか行頭が指定のインデントで始まっていなければならない。
+        error.as(IndentedFormatError)`
+          Each line must be blank or begin with the indent at the beginning of the line.
+          `;
+      }
+      // テンプレートの改変処理
+      const searchValue = `\n${indent}`;
+      return template
+        .map((s, index) => {
+          // 改行の後のインデント(つまり行頭のインデント)を除去
+          s = s.split(searchValue).join('\n');
+          if (index === 0) {
+            // 先頭の改行は除去
+            s = s.slice(1);
+          }
+          if (index === template.length - 1) {
+            // 末尾の改行も除去(末尾のインデントはreplaceAllで除去済み)
+            s = s.slice(0, -1);
+          }
+          if (unescapeFunc) {
+            // エスケープシーケンスの解除
+            s = unescapeFunc(s);
+          }
+          return s;
+        })
+        .reduce((r, e, i) => r.concat(args[i], e));
+    } catch (ex) {
+      if (unescapeFunc === unescape.safe) {
+        assert(ex instanceof Error);
+        // 書式不正は警告ログに出しておく
+        console.warn(`${ex.message}\n${captureStackTrace()}`);
+        // unescape.safeが使われているときの例外は書式不正のみ(のはずだが万一を考えてチェックはしない)なのでbasic.safeで処理
+        return basic.safe(...args);
+      }
+      if (ex instanceof Error) {
+        // スタックトレースから内部の呼び出しを除去
+        Error.captureStackTrace(ex, indented);
+      }
+      throw ex;
     }
-    // テンプレートの改変処理
-    const modifiers: Array<(s: string, index: number) => string> = [
-      s => s.replaceAll('\n' + indent, '\n'),
-      // 先頭の改行は除去
-      (s, index) => (index === 0 ? s.slice(1) : s),
-      // 末尾の改行も除去(末尾のインデントはreplaceで除去済み)
-      (s, index) => (index === template.length - 1 ? s.slice(0, -1) : s),
-      // 追加の修正
-      ...extendedModifiers,
-    ];
-    return template
-      .map((s, index) => modifiers.reduce((r, e) => e(r, index), s))
-      .reduce((r, e, i) => r.concat(args[i], e));
-  } catch (ex) {
-    if (ex instanceof Error) {
-      // スタックトレースから内部の呼び出しを除去
-      Error.captureStackTrace(ex, indented_implement);
-    }
-    throw ex;
-  }
+  };
 }
 
 /**
@@ -143,8 +106,7 @@ function indented_implement(
  * ```
  * @returns インデントを取り除いた内容
  */
-export const indented: {
-  (template: TemplateStringsArray, ...values: unknown[]): string;
+export const indented: TaggedTemplate & {
   /**
    * {@link indented}の`\`をエスケープしない版。
    *
@@ -162,7 +124,7 @@ export const indented: {
    * }
    * ```
    */
-  raw(this: void, template: TemplateStringsArray, ...values: unknown[]): string;
+  readonly raw: TaggedTemplate;
   /**
    * {@link indented}の`\u`などで正しくない記述をしている場合でも例外を投げない版。
    * ```ts
@@ -179,14 +141,10 @@ export const indented: {
    *
    * 正しくないエスケープシーケンスは`\`だけを取り除く。
    */
-  safe(
-    this: void,
-    template: TemplateStringsArray,
-    ...values: unknown[]
-  ): string;
+  readonly safe: TaggedTemplate;
 } = Object.freeze(
-  Object.assign(indented_implement.bind(null, [unescape]), {
-    raw: indented_implement.bind(null, []),
-    safe: indented_implement.bind(null, [unescape.safe]),
+  Object.assign(prepare(unescape), {
+    raw: prepare(),
+    safe: addSafeUser(prepare(unescape.safe)),
   }),
 );

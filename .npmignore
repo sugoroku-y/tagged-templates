@@ -1,4 +1,6 @@
 /lib/*.map
+/lib/concat.*
+/lib/unescape.d.ts
 /src/
 /coverage/
 /.vscode/
@@ -7,3 +9,4 @@
 .eslint*
 .prettier*
 jest.*
+/copy/

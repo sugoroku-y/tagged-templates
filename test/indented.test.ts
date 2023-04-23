@@ -37,37 +37,47 @@ multi2
     `).toBe('multi1undefined  A\nmulti2[object Object]  B');
   });
   test('empty template', () => {
-    expect(() => indented``).toThrow('The beginning must be a newline.');
+    expect(() => indented``).toThrow(
+      /^There must be a newline character immediately following the leading `\.$/,
+    );
   });
   test('The first character is not LF', () => {
     expect(
       () => indented`a
     `,
-    ).toThrow('The beginning must be a newline.');
+    ).toThrow(
+      /^There must be a newline character immediately following the leading `\.$/,
+    );
   });
   test('first template is empty', () => {
     expect(
       () => indented`${''}
     `,
-    ).toThrow('The beginning must be a newline.');
+    ).toThrow(
+      /^There must be a newline character immediately following the leading `\.$/,
+    );
   });
   test('The template is empty', () => {
-    expect(() => indented``).toThrow('The beginning must be a newline.');
+    expect(() => indented``).toThrow(
+      /^There must be a newline character immediately following the leading `\.$/,
+    );
   });
   test('The template is call as function', () => {
     const template = Object.assign([], { raw: [] });
     // タグ付きテンプレートの第1引数が空になることはないので無理矢理、空の配列を指定して呼び出し
-    expect(() => indented(template)).toThrow('Call as a tagged template.');
+    expect(() => indented(template)).toThrow(/^Call as a tagged template\.$/);
   });
   test('The last template is empty', () => {
-    expect(() => indented`${''}`).toThrow('The beginning must be a newline.');
+    expect(() => indented`${''}`).toThrow(
+      /^There must be a newline character immediately following the leading `\.$/,
+    );
   });
   test('The last template does not include LF', () => {
     expect(
       () => indented`
     ${''}    `,
     ).toThrow(
-      'The end must be spaces or tabs only from the beginning of the line.',
+      /^There must be no non-whitespace or non-tab characters between the trailing end ` and the beginning of the line\.$/,
     );
   });
   test('The last line is not just spaces and tabs', () => {
@@ -75,7 +85,7 @@ multi2
       () => indented`
       a`,
     ).toThrow(
-      'The end must be spaces or tabs only from the beginning of the line.',
+      /^There must be no non-whitespace or non-tab characters between the trailing end ` and the beginning of the line\.$/,
     );
   });
   test('Indentation is uneven', () => {
@@ -84,7 +94,9 @@ multi2
     A
   B
     `,
-    ).toThrow('Indentation is not aligned.');
+    ).toThrow(
+      /^Each line must be blank or begin with the indent at the beginning of the line\.$/,
+    );
   });
   test('Indentation is uneven with insert', () => {
     expect(
@@ -92,7 +104,9 @@ multi2
     A
 ${''}
     `,
-    ).toThrow('Indentation is not aligned.');
+    ).toThrow(
+      /^Each line must be blank or begin with the indent at the beginning of the line\.$/,
+    );
   });
   test('escaped', () => {
     expect(indented`
@@ -249,6 +263,7 @@ ${''}
   });
   test('indented freezed', () => {
     expect(() => {
+      // @ts-expect-error JavaScriptでもエラーになることを確認する
       indented.raw = () => __filename;
     }).toThrow();
   });
@@ -387,6 +402,7 @@ ${''}
   });
   test('indented freezed', () => {
     expect(() => {
+      // @ts-expect-error JavaScriptでもエラーになることを確認する
       indented.safe = () => __filename;
     }).toThrow();
   });

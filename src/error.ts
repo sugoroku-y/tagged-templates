@@ -1,21 +1,42 @@
+import type { TaggedTemplate } from './TaggedTemplate';
+import { basic } from './basic';
 import { indented } from './indented';
+import { addSafeUser } from './unescape';
 
-function prepare<ERROR extends object>(
+type ErrorTaggedTemplate = (
+  ...args: [string?] | Parameters<TaggedTemplate>
+) => never;
+
+function as<ERROR extends object>(
   clazz: new (message?: string) => ERROR,
-): (template: TemplateStringsArray, ...values: unknown[]) => never {
-  return function error(...args: [TemplateStringsArray, ...unknown[]]): never {
-    // エラーメッセージを含むERRORのインスタンスを作成する
-    const ex = new clazz(indented.safe(...args));
-    // スタックトレースからこの関数を除去する
-    Error.captureStackTrace(ex, error);
+): ErrorTaggedTemplate {
+  return addSafeUser(function error(...args) {
+    const [template, ...values] = args;
+    // 複数行のメッセージにも対応できるように、テンプレートの先頭の文字で切り分ける
+    const message =
+      !template || typeof template === 'string'
+        ? template
+        : (template.raw[0]?.charAt(0) === '\n' ? indented : basic)
+            // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、.safeを使う
+            .safe(template, ...values);
+    const ex = new clazz(message);
+    if (typeof ex === 'object') {
+      // スタックトレースからこの関数を除去する
+      Error.captureStackTrace(ex, error);
+    }
     // 作成したインスタンスをthrowする
     throw ex;
-  };
+  });
 }
 
 /**
- * テンプレート文字列として指定されたメッセージを持つ例外を生成してthrowするタグ付きテンプレート。
+ * テンプレートから生成した文字列をメッセージに持つErrorをthrowするタグ付きテンプレート。
  *
+ * メッセージの構築にはテンプレート文字列の最初が改行なら{@link indented.safe}を、改行以外であれば{@link basic.safe}を使用する。
+ *
+ * - 複数行のメッセージでもインデントが付けられて読みやすい。
+ * - エスケープシーケンスの不備などがあっても最低限の情報はわかる。
+ * @example
  * ```ts
  * const type =
  *   value === 'aaa'
@@ -25,29 +46,21 @@ function prepare<ERROR extends object>(
  *   : error`Unknown value: ${value}`;
  * ```
  */
-export const error: {
-  (template: TemplateStringsArray, ...values: unknown[]): never;
+export const error: ErrorTaggedTemplate & {
   /**
-   * throwする例外クラスを指定したerrorタグ付きテンプレートを返す。
+   * clazzで指定したクラスをthrowするタグ付きテンプレートを返す。
    *
+   * @example
    * ```ts
-   * error.for(SyntaxError)`
+   * error.as(SyntaxError)`
    *   Invalid Unicode character
    *   ${line}
    *   ${' '.repeat(col)}^
    *   `;
    * ```
    */
-  for<ERROR extends object>(
+  readonly as: <ERROR extends object>(
     this: void,
     clazz: new (message?: string) => ERROR,
-  ): (...args: [TemplateStringsArray, ...unknown[]]) => never;
-} = Object.freeze(
-  // error_implement関数をベースにerror関数を定義する
-  Object.assign(prepare(Error), {
-    // error_implement関数の第1引数にclazzを指定した関数を返す
-    for<ERROR extends object>(clazz: new (message?: string) => ERROR) {
-      return prepare(clazz);
-    },
-  }),
-);
+  ) => ErrorTaggedTemplate;
+} = Object.freeze(Object.assign(as(Error), { as }));
