@@ -68,3 +68,56 @@ describe('error.as', () => {
     }).toThrow();
   });
 });
+
+describe('unreachable', () => {
+  function unreachable(): never {
+    throw new Error('ここには来ないはず');
+  }
+
+  describe('error', () => {
+    test('no parameter', () => {
+      expect(() => {
+        error();
+        // @ts-expect-error ここで到達できないコードが検出されるのは期待通り
+        unreachable();
+      }).toThrow(/^$/);
+    });
+    test('single message', () => {
+      expect(() => {
+        error('message');
+        // @ts-expect-error ここで到達できないコードが検出されるのは期待通り
+        unreachable();
+      }).toThrow(/^message$/);
+    });
+    test('tagged template', () => {
+      expect(() => {
+        error`message`;
+        // @ts-no-error-but-expect-error ここでも到達できないコードが検出されてほしいが検出されない。実際到達しない。
+        unreachable();
+      }).toThrow(/^message$/);
+    });
+  });
+  describe('error.as', () => {
+    test('no parameter', () => {
+      expect(() => {
+        error.as(SyntaxError)();
+        // @ts-no-error-but-expect-error ここでも到達できないコードが検出されてほしいが検出されない。実際到達しない。
+        unreachable();
+      }).toThrow(SyntaxError);
+    });
+    test('single message', () => {
+      expect(() => {
+        error.as(SyntaxError)('message');
+        // @ts-no-error-but-expect-error ここでも到達できないコードが検出されてほしいが検出されない。実際到達しない。
+        unreachable();
+      }).toThrow(SyntaxError);
+    });
+    test('tagged template', () => {
+      expect(() => {
+        error.as(SyntaxError)`message`;
+        // @ts-no-error-but-expect-error ここでも到達できないコードが検出されてほしいが検出されない。実際到達しない。
+        unreachable();
+      }).toThrow(SyntaxError);
+    });
+  });
+});
