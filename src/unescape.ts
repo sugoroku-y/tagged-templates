@@ -18,6 +18,23 @@ const UNESCAPE_MAP = {
   '\\0': '\0',
 } as const;
 
+/**
+ * 桁数指定の16進数文字を表す正規表現パターン。キャプチャするところまで含める。
+ * @param n n2が省略されている場合は桁数。n2が指定されている場合は最小桁数。
+ * @param n2 指定した場合は最大桁数。省略時は桁数をnに固定
+ * @returns 生成した正規表現を返す。
+ */
+const HEXADECIMAL = (n1: number, n2?: number) => ({
+  source: /*regexp*/ `([0-9A-Fa-f]{${n1}${n2 !== undefined ? `,${n2}` : ''}})`,
+});
+const HEXADECIMAL_ESCAPE_SEQUENCE = regexp/*regexp*/ `\\(?:x${HEXADECIMAL(
+  2,
+)}|u(?:\{${HEXADECIMAL(1, 6)}\}|${HEXADECIMAL(4)}))`;
+HEXADECIMAL_ESCAPE_SEQUENCE;
+
+/**
+ * エスケープシーケンスの正規表現。
+ */
 const ESCAPE_SEQUENCE = regexp/*regexp*/ `
   // 基本的なエスケープシーケンスはエスケープ文字\とそれに続く1文字
   \\[\s\S](?:
@@ -25,15 +42,15 @@ const ESCAPE_SEQUENCE = regexp/*regexp*/ `
     (?<=0)[0-9]
     |
     // 1文字がxでそのあとに続く2文字が16進数文字であれば追加する
-    (?<=x)([0-9A-Fa-f]{2}) // $1
+    (?<=x)${HEXADECIMAL(2)} // $1
     |
     // 1文字がuでそのあとに続く文字列が以下の場合追加する。
     (?<=u)(?:
       // {～}で囲まれた1～6文字の16進数文字
-      \{([0-9A-Fa-f]{1,6})\} // $2
+      \{${HEXADECIMAL(1, 6)}\} // $2
       |
       // 4文字の16進数文字
-      ([0-9A-Fa-f]{4}) // $3
+      ${HEXADECIMAL(4)} // $3
     )
   )?
   ${{ flags: 'g' }}

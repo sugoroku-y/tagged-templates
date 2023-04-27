@@ -1,4 +1,5 @@
 import { indented } from '../src/indented';
+import './toCallConsoleWarnWith';
 
 describe('indented', () => {
   test('empty', () => {
@@ -270,135 +271,237 @@ ${''}
 });
 describe('indented.safe', () => {
   test('empty template', () => {
-    expect(indented.safe``).toBe('');
+    expect(() => {
+      expect(indented.safe``).toBe('');
+    }).toCallConsoleWarnWith(
+      /^There must be a newline character immediately following the leading `\.\n {4}at /,
+    );
   });
   test('The first character is not LF', () => {
-    expect(indented.safe`a
+    expect(() => {
+      expect(indented.safe`a
     `).toBe('a\n    ');
+    }).toCallConsoleWarnWith(
+      /^There must be a newline character immediately following the leading `\.\n {4}at /,
+    );
   });
   test('first template is empty', () => {
-    expect(indented.safe`${''}
+    expect(() => {
+      expect(indented.safe`${''}
     `).toBe('\n    ');
+    }).toCallConsoleWarnWith(
+      /^There must be a newline character immediately following the leading `\.\n {4}at /,
+    );
   });
   test('The template is empty', () => {
-    expect(indented.safe``).toBe('');
+    expect(() => {
+      expect(indented.safe``).toBe('');
+    }).toCallConsoleWarnWith(
+      /^There must be a newline character immediately following the leading `\.\n {4}at /,
+    );
   });
   test('The template is call as function', () => {
-    const template = Object.assign([], { raw: [] });
-    // タグ付きテンプレートの第1引数が空になることはないので無理矢理、空の配列を指定して呼び出し
-    expect(indented.safe(template)).toBe('');
+    expect(() => {
+      const template = Object.assign([], { raw: [] });
+      // タグ付きテンプレートの第1引数が空になることはないので無理矢理、空の配列を指定して呼び出し
+      expect(indented.safe(template)).toBe('');
+    }).toCallConsoleWarnWith(/^Call as a tagged template\.\n {4}at /);
   });
   test('The last template is empty', () => {
-    expect(indented.safe`${''}`).toBe('');
+    expect(() => {
+      expect(indented.safe`${''}`).toBe('');
+    }).toCallConsoleWarnWith(
+      /^There must be a newline character immediately following the leading `\.\n {4}at /,
+    );
   });
   test('The last template does not include LF', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
     ${''}    `).toBe('\n        ');
+    }).toCallConsoleWarnWith(
+      /^There must be no non-whitespace or non-tab characters between the trailing end ` and the beginning of the line\.\n {4}at /,
+    );
   });
   test('The last line is not just spaces and tabs', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
       a`).toBe('\n      a');
+    }).toCallConsoleWarnWith(
+      /^There must be no non-whitespace or non-tab characters between the trailing end ` and the beginning of the line\.\n {4}at /,
+    );
   });
   test('Indentation is uneven', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
     A
   B
     `).toBe('\n    A\n  B\n    ');
+    }).toCallConsoleWarnWith(
+      /^Each line must be blank or begin with the indent at the beginning of the line\.\n {4}at /,
+    );
   });
   test('Indentation is uneven with insert', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
     A
 ${''}
     `).toBe('\n    A\n\n    ');
+    }).toCallConsoleWarnWith(
+      /^Each line must be blank or begin with the indent at the beginning of the line\.\n {4}at /,
+    );
   });
   test('escaped error: unicode', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \uXXXX
           aaaaaa
           `).toBe('abc uXXXX\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\uXXXX\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: Unicode: short', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \uAAA
           aaaaaa
           `).toBe('abc uAAA\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\uAAA\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: invalid Unicode', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \uAAAX
           aaaaaa
           `).toBe('abc uAAAX\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\uAAAX\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: unicode: braced', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \u{XXXX}
           aaaaaa
           `).toBe('abc u{XXXX}\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\u\{XXXX\}\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: unicode: unmatch brace', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \u{XXXX
           aaaaaa
           `).toBe('abc u{XXXX\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\u\{XXXX\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: unicode: empty in brace', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \u{}
           aaaaaa
           `).toBe('abc u{}\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\nabc \\u\{\}\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: unicode: exceeded', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \u{11ffff}
           aaaaaa
           `).toBe('abc u{11ffff}\naaaaaa');
+    }).toCallConsoleWarnWith(
+      /^Undefined Unicode code-point\nabc \\u\{11ffff\}\n {4}\^{10}\n {4}at /,
+    );
   });
   test('escaped error: hexadecimal', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \xXX
           `).toBe('abc xXX');
+    }).toCallConsoleWarnWith(
+      /^Invalid hexadecimal escape sequence\nabc \\xXX\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: short hexadecimal', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \xA
           `).toBe('abc xA');
+    }).toCallConsoleWarnWith(
+      /^Invalid hexadecimal escape sequence\nabc \\xA\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: invalid hexadecimal', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}abc \xAX
           `).toBe('abc xAX');
+    }).toCallConsoleWarnWith(
+      /^Invalid hexadecimal escape sequence\nabc \\xAX\n {4}\^{2}\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\00', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}\00
           `).toBe('00');
+    }).toCallConsoleWarnWith(
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\n\^\^\^\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\09', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}\09
           `).toBe('09');
+    }).toCallConsoleWarnWith(
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\09\n\^\^\^\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\1', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}\1
           `).toBe('1');
+    }).toCallConsoleWarnWith(
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\1\n\^\^\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\7', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}\7
           `).toBe('7');
+    }).toCallConsoleWarnWith(
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\7\n\^\^\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\8', () => {
-    expect(indented.safe`
+    expect(() => {
+      expect(indented.safe`
           ${''}\8
           `).toBe('8');
+    }).toCallConsoleWarnWith(
+      /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\8\n\^\^\n {4}at /,
+    );
   });
   test('escaped error: octet escape sequence: \\9', () => {
-    expect(
-      indented.safe`
+    expect(() => {
+      expect(
+        indented.safe`
           ${''}\9
           `,
-    ).toBe('9');
+      ).toBe('9');
+    }).toCallConsoleWarnWith(
+      /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\9\n\^\^\n {4}at /,
+    );
   });
   test('indented freezed', () => {
     expect(() => {
@@ -454,6 +557,10 @@ describe('sample code', () => {
     expect(xxxRaw()).toBe('aaaaaa\\\nbbbbbb\n\ncccccc');
   });
   test('indented.safe', () => {
-    expect(xxxSafe()).toBe('aaaaaa uXXXX\nbbbbbb\n\ncccccc');
+    expect(() => {
+      expect(xxxSafe()).toBe('aaaaaa uXXXX\nbbbbbb\n\ncccccc');
+    }).toCallConsoleWarnWith(
+      /^Invalid Unicode escape sequence\n\\uXXXX\n\^{2}\n {4}at /,
+    );
   });
 });

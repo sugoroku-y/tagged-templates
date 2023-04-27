@@ -1,4 +1,5 @@
 import { basic } from '../src/basic';
+import './toCallConsoleWarnWith';
 
 describe('basic', () => {
   test('simple', () => {
@@ -43,7 +44,11 @@ describe('basic.safe', () => {
     expect(basic.safe`\xabc ${'def'}\tghi\n`).toBe(`\xabc def\tghi\n`);
   });
   test('invalid escape sequence', () => {
-    expect(basic.safe`\xabc ${'def'}\8ghi\n`).toBe(`\xabc def8ghi\n`);
+    expect(() => {
+      expect(basic.safe`\xabc ${'def'}\8ghi\n`).toBe(`\xabc def8ghi\n`);
+    }).toCallConsoleWarnWith(
+      /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\8ghi\\n\n\^\^\n {4}at /,
+    );
   });
   test('basic freezed: raw', () => {
     expect(() => {

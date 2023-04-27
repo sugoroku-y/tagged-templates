@@ -1,4 +1,5 @@
 import { error } from '../src/error';
+import './toCallConsoleWarnWith';
 
 describe('error', () => {
   test('exec without parameters', () => {
@@ -23,15 +24,31 @@ describe('error', () => {
     ).toThrow(/^message 123$/);
   });
   test('exec with invalid escape sequence', () => {
-    expect(
-      () =>
-        error`
-          \00\1\2\3\4\5\6\7\8\9\n${
-            // 8進数のエスケープシーケンスはタグ付きテンプレートではコンパイルエラーにならない(rawを使わない場合、実行時エラーになるだけ)
-            '' // 一つ目の${～}より前に不正なUnicodeエスケープシーケンスがあるとTypeScriptでエラーになってしまう
-          }\u{1f38f}\u{110000}\xXX\uXXXXX
-          `,
-    ).toThrow(/^00123456789\n🎏u\{110000\}xXXuXXXXX$/);
+    expect(() => {
+      expect(
+        () =>
+          error`
+            \00\1\2\3\4\5\6\7\8\9\n${
+              // 8進数のエスケープシーケンスはタグ付きテンプレートではコンパイルエラーにならない(rawを使わない場合、実行時エラーになるだけ)
+              '' // 一つ目の${～}より前に不正なUnicodeエスケープシーケンスがあるとTypeScriptでエラーになってしまう
+            }\u{1f38f}\u{110000}\xXX\uXXXXX
+            `,
+      ).toThrow(/^00123456789\n🎏u\{110000\}xXXuXXXXX$/);
+    }).toCallConsoleWarnWith(
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n\^\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {3}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {5}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {7}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {9}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {11}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {13}\^\^\n {4}at /,
+      /^Octal escape sequences are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {15}\^\^\n {4}at /,
+      /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {17}\^\^\n {4}at /,
+      /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\00\\1\\2\\3\\4\\5\\6\\7\\8\\9\\n\n {19}\^\^\n {4}at /,
+      /^Undefined Unicode code-point\n\\u\{1f38f\}\\u\{110000\}\\xXX\\uXXXXX\n {9}\^{10}\n {4}at /,
+      /^Invalid hexadecimal escape sequence\n\\u\{1f38f\}\\u\{110000\}\\xXX\\uXXXXX\n {19}\^{2}\n {4}at /,
+      /^Invalid Unicode escape sequence\n\\u\{1f38f\}\\u\{110000\}\\xXX\\uXXXXX\n {23}\^{2}\n {4}at /,
+    );
   });
 });
 describe('error.as', () => {

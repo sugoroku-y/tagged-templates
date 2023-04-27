@@ -54,7 +54,7 @@ describe('regexp', () => {
       yz
     `.source,
     ).toBe(
-      '[a-z_][a-z_0-9]*[-+](?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][-+][0-9]+)?abc def ghi jkl mno pqr stu 9vwx0 yz',
+      '[a-z_][a-z_0-9]*[-+](?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][-+][0-9]+)?abc\\s+def\\s+ghi\\s+jkl\\s+mno\\s+pqr\\s+stu\\s+9vwx0\\s+yz',
     );
   });
   test('Escaped comments are not removed', () => {
@@ -76,7 +76,7 @@ describe('regexp', () => {
       regexp/* regexp */ `
       abc def ghi      jkl   mno   pqr stu vwx yz
     `.source,
-    ).toBe('abc def ghi jkl mno pqr stu vwx yz');
+    ).toBe('abc\\s+def\\s+ghi\\s+jkl\\s+mno\\s+pqr\\s+stu\\s+vwx\\s+yz');
   });
   test('insert string and regexp', () => {
     const literal = '[]{}()';
