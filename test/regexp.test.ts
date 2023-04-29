@@ -94,3 +94,9 @@ describe('regexp', () => {
     expect(regexp`${{ flags: 's' }}`.flags).toBe('s');
   });
 });
+describe('regexp.sub', () => {
+  test('returns object, not RegExp', () => {
+    expect(regexp.sub`abc`).toEqual({ source: 'abc', flags: '' });
+    expect(regexp.sub`abc`).not.toEqual(RegExp);
+  });
+});

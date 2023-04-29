@@ -1,20 +1,24 @@
 import type { TaggedTemplate } from './TaggedTemplate';
 
-type AllCombination<
+type AllCombinations<
   STR extends string,
   PRE extends string = '',
 > = STR extends `${infer FIRST}${infer POST}`
   ?
-      | `${FIRST}${AllCombination<`${PRE}${POST}`>}`
-      | AllCombination<POST, `${PRE}${FIRST}`>
+      | `${FIRST}${AllCombinations<`${PRE}${POST}`>}`
+      | AllCombinations<POST, `${PRE}${FIRST}`>
   : '';
 
-export const regexp: TaggedTemplate<
-  RegExp,
-  string | { source: string } | { flags: AllCombination<'dgimsuy'> }
-> = function regexp(...args) {
-  let flags = '';
-  const pattern = args[0].raw
+function sub(
+  ...args: [
+    TemplateStringsArray,
+    ...ReadonlyArray<
+      string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
+    >,
+  ]
+): { source: string; flags: AllCombinations<'dgimsuy'> } {
+  let flags: AllCombinations<'dgimsuy'> = '';
+  const source = args[0].raw
     // - エスケープされた文字は残す
     //   `\/\/ aaaaaa`
     //   -> '\\/\\/ aaaaaa'
@@ -63,5 +67,23 @@ export const regexp: TaggedTemplate<
             '';
       return r.concat(pattern, e);
     });
-  return new RegExp(pattern, flags);
-};
+  return { source, flags };
+}
+
+export const regexp: TaggedTemplate<
+  RegExp,
+  string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
+> & {
+  readonly sub: TaggedTemplate<
+    { source: string; flags: AllCombinations<'dgimsuy'> },
+    string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
+  >;
+} = Object.freeze(
+  Object.assign(
+    function regexp(...args: Parameters<typeof sub>) {
+      const { source, flags } = sub(...args);
+      return new RegExp(source, flags);
+    },
+    { sub },
+  ),
+);
