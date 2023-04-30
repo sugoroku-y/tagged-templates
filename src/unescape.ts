@@ -20,8 +20,8 @@ const UNESCAPE_MAP = {
 
 /**
  * 桁数指定の16進数文字を表す正規表現パターン。キャプチャするところまで含める。
- * @param n n2が省略されている場合は桁数。n2が指定されている場合は最小桁数。
- * @param n2 指定した場合は最大桁数。省略時は桁数をnに固定
+ * @param n1 n2が省略されている場合は桁数。n2が指定されている場合は最小桁数。
+ * @param n2 指定した場合は最大桁数。省略時は桁数をn1に固定
  * @returns 生成した正規表現を返す。
  */
 const HEXADECIMAL = (n1: number, n2?: number) => ({
@@ -48,7 +48,7 @@ const ESCAPE_SEQUENCE = regexp/*regexp*/ `
       // 4文字の16進数文字
       ${HEXADECIMAL(4)} // $3
     )
-  )?
+  )? // 上記にマッチしない場合は追加しない
   ${{ flags: 'g' }}
 `;
 
@@ -80,7 +80,9 @@ export function captureStackTrace(): string {
     safeUsers
       .map(f => {
         const ex = { stack: '' };
+        // 登録された関数からのスタックトレースを構築
         Error.captureStackTrace(ex, f);
+        // 行ごとに分解して一行目はエラーメッセージなので除外
         return ex.stack.split('\n').slice(1);
       })
       // 0なのはスタックトレース上にない関数なので除外
@@ -133,7 +135,7 @@ function prepare(handleError: (message: string) => void) {
             );
           case '8':
           case '9':
-            // \8と\9も同様に禁止
+            // \8と\9も同様に禁止(古いNodeJSでは許容されているが新しい方に寄せる)
             return processError(
               `\\8 and \\9 are not allowed in indented tagged templates.`,
             );
