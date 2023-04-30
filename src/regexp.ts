@@ -1,5 +1,3 @@
-import type { TaggedTemplate } from './TaggedTemplate';
-
 type AllCombinations<
   STR extends string,
   PRE extends string = '',
@@ -9,15 +7,27 @@ type AllCombinations<
       | AllCombinations<POST, `${PRE}${FIRST}`>
   : '';
 
-function sub(
-  ...args: [
-    TemplateStringsArray,
-    ...ReadonlyArray<
-      string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
-    >,
-  ]
-): { source: string; flags: AllCombinations<'dgimsuy'> } {
-  let flags: AllCombinations<'dgimsuy'> = '';
+// 正規表現のフラグに指定できる文字列
+type RegExpFlags = AllCombinations<'dgimsuy'>;
+
+export function regexp(
+  template: TemplateStringsArray,
+  ...values: Array<
+    | string
+    | { source: string }
+    | { flags: RegExpFlags }
+    | { source: string; flags?: RegExpFlags }
+  >
+): RegExp {
+  const { source, flags } = regexp.sub(template, ...values);
+  return new RegExp(source, flags);
+}
+
+regexp.sub = function sub(...args: Parameters<typeof regexp>): {
+  source: string;
+  flags: RegExpFlags;
+} {
+  let flags: RegExpFlags = '';
   const source = args[0].raw
     // - エスケープされた文字は残す
     //   `\/\/ aaaaaa`
@@ -33,9 +43,14 @@ function sub(
     //   つまり${~}の直前や直後に空白があれば除去
     .map(s =>
       s.replace(
-        /\\[\s\S]|(?<=(\w)?)(?:\/\/.*|\/\*[\s\S]*?\*\/|\s+)+(?=(\w)?)/g,
-        (match, pre: string | undefined, post: string | undefined) =>
-          match.charAt(0) === '\\'
+        /(\\)[\s\S]|(?<=(\w)?)(?:\/\/.*|\/\*[\s\S]*?\*\/|\s+)+(?=(\w)?)/g,
+        (
+          match,
+          escaped: string | undefined,
+          pre: string | undefined,
+          post: string | undefined,
+        ) =>
+          escaped
             ? // エスケープされていればそのまま
               match
             : pre && post && match.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')
@@ -68,22 +83,4 @@ function sub(
       return r.concat(pattern, e);
     });
   return { source, flags };
-}
-
-export const regexp: TaggedTemplate<
-  RegExp,
-  string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
-> & {
-  readonly sub: TaggedTemplate<
-    { source: string; flags: AllCombinations<'dgimsuy'> },
-    string | { source: string } | { flags: AllCombinations<'dgimsuy'> }
-  >;
-} = Object.freeze(
-  Object.assign(
-    function regexp(...args: Parameters<typeof sub>) {
-      const { source, flags } = sub(...args);
-      return new RegExp(source, flags);
-    },
-    { sub },
-  ),
-);
+};
