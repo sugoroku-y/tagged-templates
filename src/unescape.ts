@@ -24,9 +24,10 @@ const UNESCAPE_MAP = {
  * @param n2 指定した場合は最大桁数。省略時は桁数をn1に固定
  * @returns 生成した正規表現を返す。
  */
-const HEXADECIMAL = (n1: number, n2?: number) => ({
-  source: /*regexp*/ `([0-9A-Fa-f]{${n1}${n2 !== undefined ? `,${n2}` : ''}})`,
-});
+const HEXADECIMAL = (n1: number, n2?: number) =>
+  regexp.sub/*regexp*/ `([0-9A-Fa-f]{${
+    n2 !== undefined ? `${n1},${n2}` : `${n1}`
+  }})`;
 
 /**
  * エスケープシーケンスの正規表現。
