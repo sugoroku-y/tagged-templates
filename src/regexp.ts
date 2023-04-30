@@ -96,23 +96,21 @@ regexp.sub = function sub(...args: Parameters<typeof regexp>): {
     .reduce((r, e, i) => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- タグ付きテンプレートで挿入される値なので範囲外ではない
       const value = args[i]!;
-      // フラグが指定されていればマージ
-      if (typeof value === 'object' && 'flags' in value) {
-        for (const flag of value.flags) {
-          if (!flags.includes(flag)) {
-            flags += flag;
-          }
-        }
-      }
       const pattern =
         typeof value === 'string'
           ? // 文字列が指定されたら正規表現の特殊文字をエスケープして挿入。
             value.replace(/[[\](){}.?+*|^$\\]/g, '\\$&')
-          : 'source' in value
-          ? // 正規表現はそのパターンをそのまま、ただし前後に影響が出ないように`(?:～)`で囲んで挿入
-            `(?:${value.source})`
-          : // 上記以外は除去
-            '';
+          : ('flags' in value &&
+              // フラグが指定されていればマージ
+              (flags += [...value.flags]
+                // flagsにないものだけを追加
+                .filter(flag => !flags.includes(flag))
+                .join('')),
+            'source' in value
+              ? // 正規表現はそのパターンをそのまま、ただし前後に影響が出ないように`(?:～)`で囲んで挿入
+                `(?:${value.source})`
+              : // 上記以外は除去
+                '');
       return r.concat(pattern, e);
     });
   return { source, flags };
