@@ -27,10 +27,6 @@ const UNESCAPE_MAP = {
 const HEXADECIMAL = (n1: number, n2?: number) => ({
   source: /*regexp*/ `([0-9A-Fa-f]{${n1}${n2 !== undefined ? `,${n2}` : ''}})`,
 });
-const HEXADECIMAL_ESCAPE_SEQUENCE = regexp/*regexp*/ `\\(?:x${HEXADECIMAL(
-  2,
-)}|u(?:\{${HEXADECIMAL(1, 6)}\}|${HEXADECIMAL(4)}))`;
-HEXADECIMAL_ESCAPE_SEQUENCE;
 
 /**
  * エスケープシーケンスの正規表現。
