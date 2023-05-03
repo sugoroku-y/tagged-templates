@@ -262,12 +262,6 @@ ${''}
       /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\9\n\^{2}$/,
     );
   });
-  test('indented freezed', () => {
-    expect(() => {
-      // @ts-expect-error JavaScriptでもエラーになることを確認する
-      indented.raw = () => __filename;
-    }).toThrow();
-  });
 });
 describe('indented.safe', () => {
   test('empty template', () => {
@@ -503,9 +497,8 @@ ${''}
       /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\9\n\^\^\n {4}at /,
     );
   });
-  test('indented freezed', () => {
+  test('freeze', () => {
     expect(() => {
-      // @ts-expect-error JavaScriptでもエラーになることを確認する
       indented.safe = () => __filename;
     }).toThrow();
   });
@@ -517,6 +510,11 @@ describe('indented.raw', () => {
     ${'abc'}\
     abc
     `).toBe('abc\\\nabc');
+  });
+  test('freeze', () => {
+    expect(() => {
+      indented.raw = () => __filename;
+    }).toThrow();
   });
 });
 

@@ -1,4 +1,4 @@
-import type { TaggedTemplate } from './TaggedTemplate';
+import assert from 'assert';
 import { regexp } from './regexp';
 
 /**
@@ -53,15 +53,20 @@ const ESCAPE_SEQUENCE = regexp/*regexp*/ `
   ${{ flags: 'g' }}
 `;
 
+type TaggedTemplate = (
+  template: TemplateStringsArray,
+  ...values: unknown[]
+) => unknown;
+
 /** unescape.safeを使う可能性のあるタグ付きテンプレートの配列 */
-const safeUsers: TaggedTemplate<unknown>[] = [];
+const safeUsers: TaggedTemplate[] = [];
 /**
  * unescape.safeを使う可能性のあるタグ付きテンプレートとして登録する。
  *
  * @export
  * @param {TaggedTemplate<unknown>} safeUser
  */
-export function addSafeUser<TEMPLATE extends TaggedTemplate<unknown>>(
+export function addSafeUser<TEMPLATE extends TaggedTemplate>(
   safeUser: TEMPLATE,
 ): TEMPLATE {
   safeUsers.push(safeUser);
@@ -99,90 +104,88 @@ export function captureStackTrace(): string {
   );
 }
 
-function prepare(handleError: (message: string) => void) {
-  return function unescape(s: string): string {
-    return s.replace(
-      ESCAPE_SEQUENCE,
-      (
-        /** マッチした文字列全体 */
-        match,
-        /** 1つ目のキャプチャ。`\xXX`のXX部分 */
-        $1: string | undefined,
-        /** 2つ目のキャプチャ。`\u{XXXXX}`のXXXXX部分 */
-        $2: string | undefined,
-        /** 3つ目のキャプチャ。`\uXXXX`のXXXX部分 */
-        $3: string | undefined,
-        /** マッチした箇所のインデックス */
-        index: number,
-      ) => {
-        if (match in UNESCAPE_MAP) {
-          // 固定変換
-          return UNESCAPE_MAP[match as keyof typeof UNESCAPE_MAP];
-        }
-        const ch = match.charAt(1);
-        switch (ch) {
-          case '0':
-          case '1':
-          case '2':
-          case '3':
-          case '4':
-          case '5':
-          case '6':
-          case '7':
-            // 8進数文字コードのエスケープはテンプレートリテラルで禁止されているのでここでも禁止
-            // ただし`\0`(その後に数字の続かないもの)だけはUNESCAPE_MAPで対応済みなのでここには来ない
-            return processError(
-              `Octal escape sequences are not allowed in indented tagged templates.`,
-            );
-          case '8':
-          case '9':
-            // \8と\9も同様に禁止(古いNodeJSでは許容されているが新しい方に寄せる)
-            return processError(
-              `\\8 and \\9 are not allowed in indented tagged templates.`,
-            );
-          case 'u':
-          case 'x': {
-            // 16進数部分
-            const hex = $1 ?? $2 ?? $3;
-            if (hex === undefined) {
-              // 16進数部分が存在しない => 正しい形式ではなかった
-              return processError(
-                ch === 'u'
-                  ? `Invalid Unicode escape sequence`
-                  : `Invalid hexadecimal escape sequence`,
-              );
-            }
-            // 文字コード
-            const code = parseInt(hex, 16);
-            if (code > 0x10ffff) {
-              // Unicodeの範囲外だった(-がパターンにないので負数は考えなくて良い)
-              return processError(`Undefined Unicode code-point`);
-            }
-            // 文字コードから文字へ
-            return String.fromCodePoint(code);
-          }
-          default:
-            // 単なるエスケープはそのまま`\`だけ削除
-            return match.slice(1);
-        }
-        function processError(message: string) {
-          // エラーがあった該当行を抽出してエラー箇所を表示
-          const bol = s.lastIndexOf('\n', index) + 1;
-          const eol = (i => (i < 0 ? s.length : i))(s.indexOf('\n', bol));
-          // エラーのあった該当行
-          const line = s.slice(bol, eol);
-          // エラーのあった位置までインデント
-          const colPadding = ' '.repeat(index - bol);
-          // エラー箇所の文字数にあわせる
-          const mark = '^'.repeat(match.length);
-          // 例外を投げる or ログ出力
-          handleError(`${message}\n${line}\n${colPadding}${mark}`);
-          // 例外を投げない場合はエラー発生時も`\`だけ削除
-          return match.slice(1);
-        }
-      },
-    );
-  };
+/**
+ * エスケープシーケンスを1文字ごと解除する
+ *
+ * @param {string} match エスケープシーケンス全体
+ * @param {(string | undefined)} $1 2桁の16進数。`\xXX`のXX部分
+ * @param {(string | undefined)} $2 1～6桁の16進数。`\u{XXXXX}`のXXXXX部分
+ * @param {(string | undefined)} $3 4桁の16進数。`\uXXXX`のXXXX部分
+ * @param {number} index 文字列全体の中でのエスケープシーケンスの位置
+ * @param {string} s 置換対象の文字列全体
+ * @returns {string} エスケープシーケンス解除後の文字
+ */
+function unescapeCharactor(
+  match: string,
+  $1: string | undefined,
+  $2: string | undefined,
+  $3: string | undefined,
+  index: number,
+  s: string,
+): string {
+  if (match in UNESCAPE_MAP) {
+    // 固定変換
+    return UNESCAPE_MAP[match as keyof typeof UNESCAPE_MAP];
+  }
+  const ch = match.charAt(1);
+  switch (ch) {
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+      // 8進数文字コードのエスケープはテンプレートリテラルで禁止されているのでここでも禁止
+      // ただし`\0`(その後に数字の続かないもの)だけはUNESCAPE_MAPで対応済みなのでここには来ない
+      return processError(
+        `Octal escape sequences are not allowed in indented tagged templates.`,
+      );
+    case '8':
+    case '9':
+      // \8と\9も同様に禁止(古いNodeJSでは許容されているが新しい方に寄せる)
+      return processError(
+        `\\8 and \\9 are not allowed in indented tagged templates.`,
+      );
+    case 'u':
+    case 'x': {
+      // 16進数部分
+      const hex = $1 ?? $2 ?? $3;
+      if (hex === undefined) {
+        // 16進数部分が存在しない => 正しい形式ではなかった
+        processError(
+          ch === 'u'
+            ? `Invalid Unicode escape sequence`
+            : `Invalid hexadecimal escape sequence`,
+        );
+      }
+      // 文字コード
+      const code = parseInt(hex, 16);
+      if (code > 0x10ffff) {
+        // Unicodeの範囲外だった(-がパターンにないので負数は考えなくて良い)
+        processError(`Undefined Unicode code-point`);
+      }
+      // 文字コードから文字へ
+      return String.fromCodePoint(code);
+    }
+    default:
+      // 単なるエスケープはそのまま`\`だけ削除
+      return match.slice(1);
+  }
+  function processError(message: string): never {
+    // エラーがあった該当行を抽出してエラー箇所を表示
+    const bol = s.lastIndexOf('\n', index) + 1;
+    const eol = (i => (i < 0 ? s.length : i))(s.indexOf('\n', bol));
+    // エラーのあった該当行
+    const line = s.slice(bol, eol);
+    // エラーのあった位置までインデント
+    const colPadding = ' '.repeat(index - bol);
+    // エラー箇所の文字数にあわせる
+    const mark = '^'.repeat(match.length);
+    // 例外を投げる or ログ出力
+    throw new SyntaxError(`${message}\n${line}\n${colPadding}${mark}`);
+  }
 }
 
 /**
@@ -203,27 +206,31 @@ function prepare(handleError: (message: string) => void) {
  * @returns エスケープシーケンスを置換した文字列
  * @throws SyntaxError 不正なエスケープシーケンスがあった場合
  */
-export const unescape: {
-  (s: string): string;
-  /**
-   * {@link unescape}と同様にエスケープシーケンスを解除する。
-   *
-   * ただし、不正なエスケープシーケンスがあった場合でも例外を投げず、`\`を除去するだけ。
-   * @param s エスケープされた文字列
-   * @returns エスケープを解除した文字列
-   */
-  readonly safe: (this: void, s: string) => string;
-} = Object.freeze(
-  Object.assign(
-    prepare(message => {
-      // 通常版では例外を投げる
-      throw new SyntaxError(message);
-    }),
-    {
-      safe: prepare(message => {
-        // 安全版は警告ログを出すだけ
-        console.warn(`${message}\n${captureStackTrace()}`);
-      }),
+export function unescape(s: string): string {
+  return s.replace(ESCAPE_SEQUENCE, unescapeCharactor);
+}
+
+/**
+ * {@link unescape}と同様にエスケープシーケンスを解除する。
+ *
+ * ただし、不正なエスケープシーケンスがあった場合でも例外を投げず、`\`を除去するだけ。
+ * @param s エスケープされた文字列
+ * @returns エスケープを解除した文字列
+ */
+unescape.safe = function unescapeSafe(s: string): string {
+  return s.replace(
+    ESCAPE_SEQUENCE,
+    (...args: Parameters<typeof unescapeCharactor>) => {
+      try {
+        return unescapeCharactor(...args);
+      } catch (ex) {
+        assert(ex instanceof Error);
+        // 安全版は警告ログを出してエスケープ文字`\`を除去
+        console.warn(`${ex.message}\n${captureStackTrace()}`);
+        return args[0].slice(1);
+      }
     },
-  ),
-);
+  );
+};
+
+Object.freeze(unescape);

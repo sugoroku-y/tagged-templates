@@ -99,4 +99,9 @@ describe('regexp.sub', () => {
     expect(regexp.sub`abc`).toEqual({ source: 'abc', flags: '' });
     expect(regexp.sub`abc`).not.toEqual(RegExp);
   });
+  test('freeze', () => {
+    expect(() => {
+      regexp.sub = () => ({ source: '', flags: '' });
+    }).toThrow();
+  });
 });

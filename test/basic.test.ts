@@ -31,6 +31,11 @@ describe('basic.raw', () => {
   test('invalid escape sequence', () => {
     expect(basic.raw`\xabc ${'def'}\8ghi\n`).toBe(String.raw`\xabc def\8ghi\n`);
   });
+  test('freeze', () => {
+    expect(() => {
+      basic.raw = () => __filename;
+    }).toThrow();
+  });
 });
 
 describe('basic.safe', () => {
@@ -50,15 +55,8 @@ describe('basic.safe', () => {
       /^\\8 and \\9 are not allowed in indented tagged templates\.\n\\8ghi\\n\n\^\^\n {4}at /,
     );
   });
-  test('basic freezed: raw', () => {
+  test('freeze', () => {
     expect(() => {
-      // @ts-expect-error JavaScriptでもエラーになることを確認する
-      basic.raw = () => __filename;
-    }).toThrow();
-  });
-  test('basic freezed: safe', () => {
-    expect(() => {
-      // @ts-expect-error JavaScriptでもエラーになることを確認する
       basic.safe = () => __filename;
     }).toThrow();
   });

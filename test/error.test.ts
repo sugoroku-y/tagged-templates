@@ -78,10 +78,11 @@ describe('error.as', () => {
     const template = Object.assign([], { raw: [] });
     expect(() => error.as(SyntaxError)(template)).toThrow(SyntaxError);
   });
-  test('error freezed', () => {
+  test('freeze', () => {
     expect(() => {
-      // @ts-expect-error JavaScriptでもエラーになることを確認する
-      error.as = () => __filename;
+      error.as = () => () => {
+        throw '';
+      };
     }).toThrow();
   });
 });

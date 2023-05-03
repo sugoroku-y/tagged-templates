@@ -1,34 +1,15 @@
-import type { TaggedTemplate } from './TaggedTemplate';
 import { basic } from './basic';
 import { indented } from './indented';
 import { addSafeUser } from './unescape';
 
-type ErrorTaggedTemplate = (
-  ...args: [string?] | Parameters<TaggedTemplate>
-) => never;
-
-function as<ERROR extends object>(
-  clazz: new (message?: string) => ERROR,
-): ErrorTaggedTemplate {
-  return addSafeUser(function error(...args) {
-    const [template, ...values] = args;
-    // 複数行のメッセージにも対応できるように、テンプレートの先頭の文字で切り分ける
-    const message =
-      !template || typeof template === 'string'
-        ? template
-        : (template.raw[0]?.charAt(0) === '\n' ? indented : basic)
-            // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、.safeを使う
-            .safe(template, ...values);
-    const ex = new clazz(message);
-    if (typeof ex === 'object') {
-      // スタックトレースからこの関数を除去する
-      Error.captureStackTrace(ex, error);
-    }
-    // 作成したインスタンスをthrowする
-    throw ex;
-  });
-}
-
+/**
+ * Errorをthrowする。
+ */
+export function error(): never;
+/**
+ * 指定した文字列をメッセージに持つErrorをthrowする。
+ */
+export function error(message: string): never;
 /**
  * テンプレートから生成した文字列をメッセージに持つErrorをthrowするタグ付きテンプレート。
  *
@@ -46,21 +27,49 @@ function as<ERROR extends object>(
  *   : error`Unknown value: ${value}`;
  * ```
  */
-export const error: ErrorTaggedTemplate & {
-  /**
-   * clazzで指定したクラスをthrowするタグ付きテンプレートを返す。
-   *
-   * @example
-   * ```ts
-   * error.as(SyntaxError)`
-   *   Invalid Unicode character
-   *   ${line}
-   *   ${' '.repeat(col)}^
-   *   `;
-   * ```
-   */
-  readonly as: <ERROR extends object>(
-    this: void,
-    clazz: new (message?: string) => ERROR,
-  ) => ErrorTaggedTemplate;
-} = Object.freeze(Object.assign(as(Error), { as }));
+export function error(
+  template: TemplateStringsArray,
+  ...values: unknown[]
+): never;
+// 実装
+export function error(
+  ...args: [string?] | [TemplateStringsArray, ...unknown[]]
+): never {
+  return error.as(Error)(...args);
+}
+
+/**
+ * clazzで指定したクラスをthrowするタグ付きテンプレートを返す。
+ *
+ * @example
+ * ```ts
+ * error.as(SyntaxError)`
+ *   Invalid Unicode character
+ *   ${line}
+ *   ${' '.repeat(col)}^
+ *   `;
+ * ```
+ */
+error.as = function as<ERROR extends object>(
+  clazz: new (message?: string) => ERROR,
+): (...args: [string?] | [TemplateStringsArray, ...unknown[]]) => never {
+  return addSafeUser(function error(...args) {
+    const [template, ...values] = args;
+    // 複数行のメッセージにも対応できるように、テンプレートの先頭の文字で切り分ける
+    const message =
+      !template || typeof template === 'string'
+        ? template
+        : (template.raw[0]?.charAt(0) === '\n' ? indented : basic)
+            // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、.safeを使う
+            .safe(template, ...values);
+    const ex = new clazz(message);
+    if (typeof ex === 'object') {
+      // スタックトレースからこの関数を除去する
+      Error.captureStackTrace(ex, error);
+    }
+    // 作成したインスタンスをthrowする
+    throw ex;
+  });
+};
+
+Object.freeze(error);

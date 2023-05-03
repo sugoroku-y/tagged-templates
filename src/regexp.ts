@@ -115,3 +115,5 @@ regexp.sub = function sub(...args: Parameters<typeof regexp>): {
     });
   return { source, flags };
 };
+
+Object.freeze(regexp);
