@@ -41,34 +41,24 @@ function extractIndent(template: readonly string[]): string {
   return indent;
 }
 
-function arrangeTemplate(
-  searchValue: string,
-  s: string,
-  index: number,
-  template: readonly string[],
-): string {
-  // 改行の後のインデント(つまり行頭のインデント)を除去
-  s = s.split(searchValue).join('\n');
-  if (index === 0) {
-    // 先頭の改行は除去
-    s = s.slice(1);
-  }
-  if (index === template.length - 1) {
-    // 末尾の改行も除去(末尾のインデントはreplaceAllで除去済み)
-    s = s.slice(0, -1);
-  }
-  return s;
-}
-
-function prepareTemplate(
-  template: TemplateStringsArray,
-  arrange: typeof arrangeTemplate,
-): readonly string[] {
+function prepareTemplate(template: TemplateStringsArray): readonly string[] {
   // 行末に`\`があればインデントと一緒に改行を除去するためにrawを使う
   const indent = extractIndent(template.raw);
   // テンプレートの改変処理
   const searchValue = `\n${indent}`;
-  return template.raw.map((...args) => arrange(searchValue, ...args));
+  return template.raw.map((s, index) => {
+    // 改行の後のインデント(つまり行頭のインデント)を除去
+    s = s.split(searchValue).join('\n');
+    if (index === 0) {
+      // 先頭の改行は除去
+      s = s.slice(1);
+    }
+    if (index === template.length - 1) {
+      // 末尾の改行も除去(末尾のインデントはreplaceAllで除去済み)
+      s = s.slice(0, -1);
+    }
+    return s;
+  });
 }
 
 /**
@@ -103,9 +93,7 @@ export function indented(
   ...values: unknown[]
 ): string {
   try {
-    const arranged = prepareTemplate(template, (...args) =>
-      unescape(arrangeTemplate(...args)),
-    );
+    const arranged = prepareTemplate(template).map(unescape);
     return taggedTemplateBase(arranged, values);
   } catch (ex) {
     assert(ex instanceof Error);
@@ -137,7 +125,7 @@ indented.raw = function indentedRaw(
   template: TemplateStringsArray,
   ...values: unknown[]
 ): string {
-  const arranged = prepareTemplate(template, arrangeTemplate);
+  const arranged = prepareTemplate(template);
   return taggedTemplateBase(arranged, values);
 };
 
@@ -163,9 +151,7 @@ indented.safe = addSafeUser(function indentedSafe(
   ...values: unknown[]
 ): string {
   try {
-    const arranged = prepareTemplate(template, (...args) =>
-      unescape.safe(arrangeTemplate(...args)),
-    );
+    const arranged = prepareTemplate(template).map(unescape.safe);
     return taggedTemplateBase(arranged, values);
   } catch (ex) {
     assert(ex instanceof Error);
