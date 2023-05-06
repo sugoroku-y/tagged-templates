@@ -41,7 +41,7 @@ function extractIndent(template: readonly string[]): string {
   return indent;
 }
 
-function prepareTemplate(template: TemplateStringsArray): readonly string[] {
+function unindent(template: TemplateStringsArray): readonly string[] {
   // 行末に`\`があればインデントと一緒に改行を除去するためにrawを使う
   const indent = extractIndent(template.raw);
   // テンプレートの改変処理
@@ -93,8 +93,7 @@ export function indented(
   ...values: unknown[]
 ): string {
   try {
-    const arranged = prepareTemplate(template).map(unescape);
-    return taggedTemplateBase(arranged, values);
+    return taggedTemplateBase(unindent(template).map(unescape), values);
   } catch (ex) {
     assert(ex instanceof Error);
     // スタックトレースから内部の呼び出しを除去
@@ -125,8 +124,7 @@ indented.raw = function indentedRaw(
   template: TemplateStringsArray,
   ...values: unknown[]
 ): string {
-  const arranged = prepareTemplate(template);
-  return taggedTemplateBase(arranged, values);
+  return taggedTemplateBase(unindent(template), values);
 };
 
 /**
@@ -151,8 +149,7 @@ indented.safe = addSafeUser(function indentedSafe(
   ...values: unknown[]
 ): string {
   try {
-    const arranged = prepareTemplate(template).map(unescape.safe);
-    return taggedTemplateBase(arranged, values);
+    return taggedTemplateBase(unindent(template).map(unescape.safe), values);
   } catch (ex) {
     assert(ex instanceof Error);
     // 書式不正は警告ログに出しておく
