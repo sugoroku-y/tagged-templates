@@ -1,3 +1,4 @@
+import assert from 'assert';
 import { taggedTemplateBase } from './taggedTemplateBase';
 import { unescape, addSafeUser } from './unescape';
 
@@ -11,7 +12,14 @@ export function basic(
   template: TemplateStringsArray,
   ...values: unknown[]
 ): string {
-  return taggedTemplateBase(template.raw.map(unescape), values);
+  try {
+    return taggedTemplateBase(template.raw.map(unescape), values);
+  } catch (ex) {
+    assert(ex instanceof Error);
+    // スタックトレースから内部の呼び出しを除去
+    Error.captureStackTrace(ex, basic);
+    throw ex;
+  }
 }
 
 /**
