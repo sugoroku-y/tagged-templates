@@ -63,8 +63,8 @@ error.as = function as(
             // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、.safeを使う
             .safe(template, ...values);
     const ex = new clazz(message);
-      // スタックトレースからこの関数を除去する
-      Error.captureStackTrace(ex, error);
+    // スタックトレースからこの関数を除去する
+    Error.captureStackTrace(ex, error);
     // 作成したインスタンスをthrowする
     throw ex;
   });
