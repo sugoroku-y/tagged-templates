@@ -1,4 +1,4 @@
-import { taggedTemplateBase } from './taggedTemplateBase';
+import { prepareTemplate, taggedTemplateBase } from './taggedTemplateBase';
 
 type AllCombinations<
   STR extends string,
@@ -64,14 +64,12 @@ export function regexp(
  *
  * `source`を正規表現として解釈しないので、{@link regexp}の挿入値としての正規表現パターンを生成するときに利用する。
  */
-regexp.sub = function sub(
-  template: TemplateStringsArray,
-  ...values: RegExpTemplateParam[]
-): {
-  source: string;
-  flags: RegExpFlags;
-} {
-  const arranged = template.raw
+regexp.sub = taggedTemplateBase({
+  initializeContext(): Pick<RegExpLike, 'flags'> {
+    return { flags: '' };
+  },
+  prepareTemplate: prepareTemplate.raw,
+  modifyTemplate: s =>
     // - エスケープされた文字は残す
     //   `\/\/ aaaaaa`
     //   -> '\\/\\/ aaaaaa'
@@ -84,31 +82,28 @@ regexp.sub = function sub(
     //   `aaa  \n  ` -> 'aaa'
     // - ${~}部分については実際に挿入される値が英数字かどうかにかかわらず、何もないものと見なされる
     //   つまり${~}の直前や直後に空白があれば除去
-    .map(s =>
-      s.replace(
-        /(\\)[\s\S]|(?<=(\w)?)(?:\/\/.*|\/\*[\s\S]*?\*\/|\s+)+(?=(\w)?)/g,
-        (
-          /** マッチした文字列 */
-          match,
-          /** エスケープシーケンスかどうか */
-          escaped: string | undefined,
-          /** マッチしたところの直前に英数字があるかどうか */
-          pre: string | undefined,
-          /** マッチしたところの直後に英数字があるかどうか */
-          post: string | undefined,
-        ) =>
-          escaped
-            ? // エスケープされていればそのまま
-              match
-            : pre && post && match.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')
-            ? // 前後に英数字があって、コメント除去しても空文字列でない=連続した空白文字があったら1文字以上の空白文字に
-              '\\s+'
-            : // その他は削除
-              '',
-      ),
-    );
-  let flags: RegExpFlags = '';
-  const source = taggedTemplateBase(arranged, values, value => {
+    s.replace(
+      /(\\)[\s\S]|(?<=(\w)?)(?:\/\/.*|\/\*[\s\S]*?\*\/|\s+)+(?=(\w)?)/g,
+      (
+        /** マッチした文字列 */
+        match,
+        /** エスケープシーケンスかどうか */
+        escaped: string | undefined,
+        /** マッチしたところの直前に英数字があるかどうか */
+        pre: string | undefined,
+        /** マッチしたところの直後に英数字があるかどうか */
+        post: string | undefined,
+      ) =>
+        escaped
+          ? // エスケープされていればそのまま
+            match
+          : pre && post && match.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')
+          ? // 前後に英数字があって、コメント除去しても空文字列でない=連続した空白文字があったら1文字以上の空白文字に
+            '\\s+'
+          : // その他は削除
+            '',
+    ),
+  convertValue: function (value: RegExpTemplateParam) {
     if (typeof value === 'string') {
       // 文字列が指定されたら正規表現の特殊文字をエスケープして挿入。
       return value.replace(/[[\](){}.?+*|^$\\]/g, '\\$&');
@@ -116,9 +111,9 @@ regexp.sub = function sub(
     if (typeof value.flags === 'string') {
       // フラグが指定されていればマージ
       for (const flag of value.flags) {
-        if (!flags.includes(flag)) {
+        if (!this.flags.includes(flag)) {
           // flagsにないものだけを追加
-          flags += flag;
+          this.flags += flag;
         }
       }
     }
@@ -127,8 +122,10 @@ regexp.sub = function sub(
         `(?:${value.source})`
       : // 上記以外は除去
         '';
-  });
-  return { source, flags };
-};
+  },
+  generate: function (source) {
+    return { ...this, source };
+  },
+});
 
 Object.freeze(regexp);
