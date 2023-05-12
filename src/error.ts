@@ -50,8 +50,8 @@ export function error(
  *   `;
  * ```
  */
-error.as = function as<ERROR extends object>(
-  clazz: new (message?: string) => ERROR,
+error.as = function as(
+  clazz: new (message?: string) => Error,
 ): (...args: [string?] | [TemplateStringsArray, ...unknown[]]) => never {
   return addSafeUser(function error(...args) {
     const [template, ...values] = args;
