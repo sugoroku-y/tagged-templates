@@ -1,4 +1,4 @@
-export * from './basic';
-export * from './error';
-export * from './indented';
-export * from './regexp';
+export { basic } from './basic';
+export { error } from './error';
+export { indented } from './indented';
+export { regexp } from './regexp';
