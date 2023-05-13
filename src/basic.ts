@@ -1,7 +1,8 @@
-import { prepareTemplate as p, taggedTemplateBase } from './taggedTemplateBase';
+import {
+  prepareTemplateRaw as prepareTemplate,
+  taggedTemplateBase,
+} from './taggedTemplateBase';
 import { unescape, addSafeUser } from './unescape';
-
-const { raw: prepareTemplate } = p;
 
 /**
  * 通常のテンプレートリテラルと同じ文字列を生成するタグ付きテンプレート。
