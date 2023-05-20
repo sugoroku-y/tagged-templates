@@ -1,5 +1,6 @@
 import assert from 'assert';
 import { regexp } from './regexp';
+import { TaggedTemplate } from './taggedTemplateBase';
 
 /**
  * エスケープシーケンスのうち、固定変換マップ
@@ -19,54 +20,44 @@ const UNESCAPE_MAP = {
 } as const;
 
 /**
- * 桁数指定の16進数文字を表す正規表現パターン。キャプチャするところまで含める。
- * @param n1 n2が省略されている場合は桁数。n2が指定されている場合は最小桁数。
- * @param n2 指定した場合は最大桁数。省略時は桁数をn1に固定
- * @returns 生成した正規表現を返す。
+ * 16進数文字を表す正規表現パターン。
  */
-const HEXADECIMAL = (n1: number, n2?: number) =>
-  regexp.sub/*regexp*/ `([0-9A-Fa-f]{${
-    n2 !== undefined ? `${n1},${n2}` : `${n1}`
-  }})`;
-
+const HEXADECIMAL = /[0-9A-Fa-f]/;
 /**
  * エスケープシーケンスの正規表現。
  */
 const ESCAPE_SEQUENCE = regexp/*regexp*/ `
   // 基本的なエスケープシーケンスはエスケープ文字\とそれに続く1文字
-  \\[\s\S](?:
+  \\([\s\S]) // $1 = ch
+  (?:
     // 1文字が0でそのあとに続く1文字が数字なら(エラーにするために)追加する
     (?<=0)[0-9]
     |
     // 1文字がxでそのあとに続く2文字が16進数文字であれば追加する
-    (?<=x)${HEXADECIMAL(2)} // $1
+    (?<=x)(${HEXADECIMAL}{2}) // $2 = hexadecimal
     |
     // 1文字がuでそのあとに続く文字列が以下の場合追加する。
-    (?<=u)(?:
-      // {～}で囲まれた1～6文字の16進数文字
-      \{${HEXADECIMAL(1, 6)}\} // $2
+    (?<=u)
+    (?:
+      // {～}で囲まれた1文字以上の16進数文字
+      \{(${HEXADECIMAL}+)\} // $3 = unicodePoint
       |
       // 4文字の16進数文字
-      ${HEXADECIMAL(4)} // $3
+      (${HEXADECIMAL}{4}) // $4 = unicode
     )
   )? // 上記にマッチしない場合は追加しない
   ${{ flags: 'g' }}
 `;
 
-type TaggedTemplate = (
-  template: TemplateStringsArray,
-  ...values: unknown[]
-) => unknown;
-
 /** unescape.safeを使う可能性のあるタグ付きテンプレートの配列 */
-const safeUsers: TaggedTemplate[] = [];
+const safeUsers: TaggedTemplate<unknown, unknown>[] = [];
 /**
  * unescape.safeを使う可能性のあるタグ付きテンプレートとして登録する。
  *
  * @export
- * @param {TaggedTemplate<unknown>} safeUser
+ * @param {TaggedTemplate<unknown, unknown>} safeUser
  */
-export function addSafeUser<TEMPLATE extends TaggedTemplate>(
+export function addSafeUser<TEMPLATE extends TaggedTemplate<unknown, unknown>>(
   safeUser: TEMPLATE,
 ): TEMPLATE {
   safeUsers.push(safeUser);
@@ -108,18 +99,20 @@ export function captureStackTrace(): string {
  * エスケープシーケンスを1文字ごと解除する
  *
  * @param {string} match エスケープシーケンス全体
- * @param {(string | undefined)} $1 2桁の16進数。`\xXX`のXX部分
- * @param {(string | undefined)} $2 1～6桁の16進数。`\u{XXXXX}`のXXXXX部分
- * @param {(string | undefined)} $3 4桁の16進数。`\uXXXX`のXXXX部分
+ * @param {string} ch $1 エスケープされる文字
+ * @param {string | undefined} hexadecimal 2桁の16進数。`\xXX`のXX部分
+ * @param {string | undefined} unicodePoint 1桁以上の16進数。`\u{XXXXX}`のXXXXX部分
+ * @param {string | undefined} unicode 4桁の16進数。`\uXXXX`のXXXX部分
  * @param {number} index 文字列全体の中でのエスケープシーケンスの位置
  * @param {string} s 置換対象の文字列全体
  * @returns {string} エスケープシーケンス解除後の文字
  */
 function unescapeCharactor(
   match: string,
-  $1: string | undefined,
-  $2: string | undefined,
-  $3: string | undefined,
+  ch: string,
+  hexadecimal: string | undefined,
+  unicodePoint: string | undefined,
+  unicode: string | undefined,
   index: number,
   s: string,
 ): string {
@@ -127,7 +120,6 @@ function unescapeCharactor(
     // 固定変換
     return UNESCAPE_MAP[match as keyof typeof UNESCAPE_MAP];
   }
-  const ch = match.charAt(1);
   switch (ch) {
     case '0':
     case '1':
@@ -139,27 +131,28 @@ function unescapeCharactor(
     case '7':
       // 8進数文字コードのエスケープはテンプレートリテラルで禁止されているのでここでも禁止
       // ただし`\0`(その後に数字の続かないもの)だけはUNESCAPE_MAPで対応済みなのでここには来ない
-      return processError(
+      processError(
         `Octal escape sequences are not allowed in indented tagged templates.`,
       );
+    // eslint-disable-next-line no-fallthrough -- processErrorは返値の型がneverなのでfallthroughにはならない
     case '8':
     case '9':
       // \8と\9も同様に禁止(古いNodeJSでは許容されているが新しい方に寄せる)
-      return processError(
-        `\\8 and \\9 are not allowed in indented tagged templates.`,
-      );
+      processError(`\\8 and \\9 are not allowed in indented tagged templates.`);
+    // eslint-disable-next-line no-fallthrough -- processErrorは返値の型がneverなのでfallthroughにはならない
     case 'u':
     case 'x': {
       // 16進数部分
-      const hex = $1 ?? $2 ?? $3;
-      if (hex === undefined) {
+      const hex =
+        hexadecimal ??
+        unicodePoint ??
+        unicode ??
         // 16進数部分が存在しない => 正しい形式ではなかった
         processError(
           ch === 'u'
             ? `Invalid Unicode escape sequence`
             : `Invalid hexadecimal escape sequence`,
         );
-      }
       // 文字コード
       const code = parseInt(hex, 16);
       if (code > 0x10ffff) {
@@ -181,8 +174,8 @@ function unescapeCharactor(
     const line = s.slice(bol, eol);
     // エラーのあった位置までインデント
     const colPadding = ' '.repeat(index - bol);
-    // エラー箇所の文字数にあわせる
-    const mark = '^'.repeat(match.length);
+    // エラー箇所の文字数にあわせる(ただし最大10文字)
+    const mark = '^'.repeat(Math.min(match.length, 10));
     // 例外を投げる or ログ出力
     throw new SyntaxError(`${message}\n${line}\n${colPadding}${mark}`);
   }

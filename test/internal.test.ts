@@ -9,6 +9,6 @@ describe('unescape.safe', () => {
 
 describe('taggedTemplateBase', () => {
   test('empty methods', () => {
-    expect(taggedTemplateBase()`abc${'def'}ghi`).toBe('abcdefghi');
+    expect(taggedTemplateBase({})`abc${'def'}ghi`).toBe('abcdefghi');
   });
 });

@@ -2,13 +2,17 @@ import assert from 'assert';
 import { unescape, captureStackTrace, addSafeUser } from './unescape';
 import {
   TaggedTemplateContext,
-  prepareTemplateRaw,
   taggedTemplateBase,
 } from './taggedTemplateBase';
 
 class IndentedFormatError extends Error {
   override name = 'IndentedFormatError';
 }
+
+/** modifyTemplateの引数 */
+type ModifyTemplateParam = Parameters<
+  NonNullable<TaggedTemplateContext['modifyTemplate']>
+>;
 
 abstract class IndentedContextBase implements TaggedTemplateContext {
   /**
@@ -55,27 +59,18 @@ abstract class IndentedContextBase implements TaggedTemplateContext {
     this.searchValue = `\n${indent}`;
   }
 
-  readonly prepareTemplate = prepareTemplateRaw;
-
-  abstract modifyTemplate(
-    s: string,
-    index: number,
-    template: readonly string[],
-  ): string;
+  /** template.rawを使う */
+  readonly withoutUnescaping = true;
 
   /**
    * テンプレート文字列からインデントを除去する。
    *
    * @param {string} s 元のテンプレート文字列
    * @param {number} index テンプレート文字列のインデックス
-   * @param {readonlystring[]} template テンプレート文字列の配列
+   * @param {readonly string[]} template テンプレート文字列の配列
    * @returns {string} 整形後のテンプレート文字列
    */
-  protected unindent(
-    s: string,
-    index: number,
-    template: readonly string[],
-  ): string {
+  modifyTemplate(...[s, index, template]: ModifyTemplateParam): string {
     // 改行の後のインデント(つまり行頭のインデント)を除去
     s = s.split(this.searchValue).join('\n');
     if (index === 0) {
@@ -91,32 +86,16 @@ abstract class IndentedContextBase implements TaggedTemplateContext {
 }
 
 class IndentedContext extends IndentedContextBase {
-  override modifyTemplate(
-    s: string,
-    index: number,
-    template: readonly string[],
-  ): string {
-    return unescape(this.unindent(s, index, template));
+  override modifyTemplate(...args: ModifyTemplateParam): string {
+    return unescape(super.modifyTemplate(...args));
   }
 }
 
-class IndentedRawContext extends IndentedContextBase {
-  override modifyTemplate(
-    s: string,
-    index: number,
-    template: readonly string[],
-  ): string {
-    return this.unindent(s, index, template);
-  }
-}
+class IndentedRawContext extends IndentedContextBase {}
 
-class IndentedSafeContext extends IndentedContextBase {
-  override modifyTemplate(
-    s: string,
-    index: number,
-    template: readonly string[],
-  ): string {
-    return unescape.safe(this.unindent(s, index, template));
+export class IndentedSafeContext extends IndentedContextBase {
+  override modifyTemplate(...args: ModifyTemplateParam): string {
+    return unescape.safe(super.modifyTemplate(...args));
   }
 }
 
@@ -194,7 +173,7 @@ export const indented = Object.freeze(
             console.warn(`${ex.message}\n${captureStackTrace()}`);
             // エラーだったらbasic.safeと同じcontextを返す
             return {
-              prepareTemplate: prepareTemplateRaw,
+              withoutUnescaping: true,
               modifyTemplate: unescape.safe,
             };
           }

@@ -1,7 +1,4 @@
-import {
-  prepareTemplateRaw as prepareTemplate,
-  taggedTemplateBase,
-} from './taggedTemplateBase';
+import { taggedTemplateBase } from './taggedTemplateBase';
 import { unescape, addSafeUser } from './unescape';
 
 /**
@@ -12,14 +9,14 @@ import { unescape, addSafeUser } from './unescape';
 export const basic = Object.freeze(
   Object.assign(
     taggedTemplateBase({
-      prepareTemplate,
+      withoutUnescaping: true,
       modifyTemplate: unescape,
     }),
     {
       /**
        * String.rawと同じくエスケープシーケンスを処理しないタグ付きテンプレート。
        */
-      raw: taggedTemplateBase({ prepareTemplate }),
+      raw: taggedTemplateBase({ withoutUnescaping: true }),
       /**
        * 通常のテンプレートリテラルとほぼ同じ文字列を生成するタグ付きテンプレート。
        *
@@ -27,7 +24,7 @@ export const basic = Object.freeze(
        */
       safe: addSafeUser(
         taggedTemplateBase({
-          prepareTemplate,
+          withoutUnescaping: true,
           modifyTemplate: unescape.safe,
         }),
       ),

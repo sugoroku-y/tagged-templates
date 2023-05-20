@@ -1,15 +1,32 @@
-import { basic } from './basic';
-import { indented } from './indented';
-import { addSafeUser } from './unescape';
+import assert from 'assert';
+import { IndentedSafeContext } from './indented';
+import { taggedTemplateBase } from './taggedTemplateBase';
+import { addSafeUser, captureStackTrace, unescape } from './unescape';
 
 /**
- * Errorをthrowする。
+ * エラーメッセージ生成用タグ付きテンプレート。
+ *
+ * 最初が改行文字の場合はindented.safeと同じ、それ以外はbasic.safeと同じ書式でメッセージを構築する。
+ *
+ * 書式に不備があった場合はwarnログにエラー内容が出力される。
  */
-export function error(): never;
-/**
- * 指定した文字列をメッセージに持つErrorをthrowする。
- */
-export function error(message: string): never;
+const errorTaggedTemplate = taggedTemplateBase(template => {
+  try {
+    if (template.raw[0]?.charAt(0) === '\n') {
+      // 複数行のメッセージにも対応できるように、テンプレートの先頭の文字で切り分ける
+      return new IndentedSafeContext(template);
+    }
+  } catch (ex) {
+    assert(ex instanceof Error);
+    console.warn(`${ex.message}\n${captureStackTrace()}`);
+  }
+  // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、basic.safeとおなじcontextを使う
+  return {
+    withoutUnescaping: true,
+    modifyTemplate: unescape.safe,
+  };
+});
+
 /**
  * テンプレートから生成した文字列をメッセージに持つErrorをthrowするタグ付きテンプレート。
  *
@@ -27,11 +44,6 @@ export function error(message: string): never;
  *   : error`Unknown value: ${value}`;
  * ```
  */
-export function error(
-  template: TemplateStringsArray,
-  ...values: unknown[]
-): never;
-// 実装
 export function error(
   ...args: [string?] | [TemplateStringsArray, ...unknown[]]
 ): never {
@@ -55,13 +67,10 @@ error.as = function as(
 ): (...args: [string?] | [TemplateStringsArray, ...unknown[]]) => never {
   return addSafeUser(function error(...args) {
     const [template, ...values] = args;
-    // 複数行のメッセージにも対応できるように、テンプレートの先頭の文字で切り分ける
     const message =
       !template || typeof template === 'string'
         ? template
-        : (template.raw[0]?.charAt(0) === '\n' ? indented : basic)
-            // エスケープシーケンスの不備などがあっても最低限のエラーメッセージが出せるように、.safeを使う
-            .safe(template, ...values);
+        : errorTaggedTemplate(template, ...values);
     const ex = new clazz(message);
     // スタックトレースからこの関数を除去する
     Error.captureStackTrace(ex, error);
